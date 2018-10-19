@@ -105,6 +105,8 @@ ydf <<- ydf
 ```{r}
 swp_daily(monday)
 xdf$date <- md
+xdf$scrapeddate <- Sys.Date()
+ydf$scrapeddate <- Sys.Date()
 ydf$date <- md
 mxdf <- xdf
 mydf <- ydf
@@ -112,35 +114,47 @@ mydf <- ydf
 swp_daily(tuesday)
 xdf$date <- td
 ydf$date <- td
+xdf$scrapeddate <- Sys.Date()
+ydf$scrapeddate <- Sys.Date()
 txdf <- xdf
 tydf <- ydf
 
 swp_daily(wensday)
 xdf$date <- wd
 ydf$date <- wd
+xdf$scrapeddate <- Sys.Date()
+ydf$scrapeddate <- Sys.Date()
 wxdf <- xdf
 wydf <- ydf
 swp_daily(thursday)
 xdf$date <- thd
 ydf$date <- thd
+xdf$scrapeddate <- Sys.Date()
+ydf$scrapeddate <- Sys.Date()
 thxdf <- xdf
 thydf <- ydf
 
 swp_daily(friday)
 xdf$date <- fd
 ydf$date <- fd
+xdf$scrapeddate <- Sys.Date()
+ydf$scrapeddate <- Sys.Date()
 fxdf <- xdf
 fydf <- ydf
 
 swp_daily(saturday)
 xdf$date <- sd
 ydf$date <- sd
+xdf$scrapeddate <- Sys.Date()
+ydf$scrapeddate <- Sys.Date()
 sxdf <- xdf
 sydf <- ydf
 
 swp_daily(sunday)
 xdf$date <- sud
 ydf$date <- sud
+xdf$scrapeddate <- Sys.Date()
+ydf$scrapeddate <- Sys.Date()
 suxdf <- xdf
 suydf <- ydf
 ```
@@ -150,22 +164,20 @@ suydf <- ydf
 # Import / Merge / Update / Save
 ```{r}
 library(xlsx)
+library(openxlsx)
 # Import
 setwd("Y:\\Share\\Water Conditions\\Daily Water Report")
-datax <- read.xlsx("DailyWaterReportWebScrape.xlsx", sheetName = "pg1")
-datay <- read.xlsx("DailyWaterReportWebScrape.xlsx", sheetName = "pg2")
-datax <- datax[,-1]
-datay <- datay[,-1]
+datax <- xlsx::read.xlsx("DailyWaterReportWebScrape.xlsx", sheetName = "pg1")
+datay <- xlsx::read.xlsx("DailyWaterReportWebScrape.xlsx", sheetName = "pg2")
 # Merge
 datanewx <- rbind(datax, mxdf, txdf, wxdf, thxdf, fxdf, sxdf, suxdf)
 datanewy <- rbind(datay, mydf, tydf, wydf, thydf, fydf, sydf, suydf)
-datanewx <- datanewx[!duplicated(datanewx),]
-datanewy <- datanewy[!duplicated(datanewy),]
+#Remove duplicated rows w/ exception of scraped date
+datanewx <- datanewx[!duplicated(datanewx[,1:12]),]
+datanewy <- datanewy[!duplicated(datanewy[,1:3]),]
 # Save
-wb <- createWorkbook(type = "xlsx")
-sheet1 <- createSheet(wb, sheetName = "pg1")
-sheet2 <- createSheet(wb, sheetName = "pg2")
-addDataFrame(datanewx, sheet1, startRow = 1, startColumn = 1)
-addDataFrame(datanewy, sheet2, startRow = 1, startColumn = 1)
-saveWorkbook(wb, "DailyWaterReportWebScrape.xlsx")
+wb <- loadWorkbook("DailyWaterReportWebScrape.xlsx")
+writeData(wb,sheet = "pg1", datanewx)
+writeData(wb,sheet = "pg2", datanewy)
+saveWorkbook(wb, "DailyWaterReportWebScrape.xlsx",overwrite=T)
 ```
