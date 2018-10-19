@@ -1,0 +1,171 @@
+---
+title: "Daily Dispatchers"
+author: "Ethan"
+date: "October 19, 2018"
+output: html_document
+---
+
+# Links
+```{r}
+monday <- "https://water.ca.gov/-/media/DWR-Website/Web-Pages/Programs/State-Water-Project/Operations-And-Maintenance/Files/Operations-Control-Office/Project-Wide-Operations/Dispatchers-Monday-Water-Report.txt?la=en&hash=B8C874426999D484F7CF1E9821EE9D8C6896CF1E"
+tuesday <- "https://water.ca.gov/-/media/DWR-Website/Web-Pages/Programs/State-Water-Project/Operations-And-Maintenance/Files/Operations-Control-Office/Project-Wide-Operations/Dispatchers-Tuesday-Water-Report.txt?la=en&hash=F032998713812E74FF16BF671A29E3070E53C775"
+wensday <- "https://water.ca.gov/-/media/DWR-Website/Web-Pages/Programs/State-Water-Project/Operations-And-Maintenance/Files/Operations-Control-Office/Project-Wide-Operations/Dispatchers-Wednesday-Water-Report.txt?la=en&hash=3F3BBD55749E328ED15A05381270472245513188"
+thursday <- "https://water.ca.gov/-/media/DWR-Website/Web-Pages/Programs/State-Water-Project/Operations-And-Maintenance/Files/Operations-Control-Office/Project-Wide-Operations/Dispatchers-Thursday-Water-Report.txt?la=en&hash=FA117CCA61EA09C044F199051817EB01B03965FB"
+friday <- "https://water.ca.gov/-/media/DWR-Website/Web-Pages/Programs/State-Water-Project/Operations-And-Maintenance/Files/Operations-Control-Office/Project-Wide-Operations/Dispatchers-Friday-Water-Report.txt?la=en&hash=E6E731D4446BD966D9DCCC0ADFE83BC9ECB66A79"
+saturday <- "https://water.ca.gov/-/media/DWR-Website/Web-Pages/Programs/State-Water-Project/Operations-And-Maintenance/Files/Operations-Control-Office/Project-Wide-Operations/Dispatchers-Saturday-Water-Report.txt?la=en&hash=606436184DFE8CCF45CE9BCE7121D8FFF03D3F86"
+sunday <- "https://water.ca.gov/-/media/DWR-Website/Web-Pages/Programs/State-Water-Project/Operations-And-Maintenance/Files/Operations-Control-Office/Project-Wide-Operations/Dispatchers-Sunday-Water-Report.txt?la=en&hash=659DF08DF8DFA19DD5CC49AB78868997FA60C6B5"
+```
+
+# Dates
+```{r}
+md <- "2018-10-15"
+td <- "2018-10-16"
+wd <- "2018-10-17"
+thd <- "2018-10-18"
+fd <- "2018-10-12"
+sd <- "2018-10-13"
+sud <- "2018-10-14"
+```
+# Function
+
+```{r setup}
+swp_daily <- function(x) {
+
+library(httr)
+library(stringi)
+  
+
+res <- httr::GET(x)
+
+l <- stri_split_lines(content(res))[[1]]
+
+page_breaks <- which(stri_detect_fixed(l, "SUMMARY OF SWP"))
+
+# target page 1
+page_one <- l[1:(page_breaks[2]-1)]
+
+# find all the records on the page
+recs <- paste0(page_one[stri_detect_regex(page_one, "^[[:alpha:]].*[[:digit:]]\\.")], collapse="\n")
+
+# read it in as a fixed-width text file (b/c it really kinda is)
+read.fwf(
+  textConnection(recs),
+  widths = c(10, 7, 8, 7, 7, 8, 8, 5, 7, 6, 7),
+  stringsAsFactors = FALSE
+) -> xdf
+
+# clean up the columns
+xdf[] <- lapply(xdf, stri_trim_both)
+xdf[] <- lapply(xdf, function(x) ifelse(grepl("\\.\\.|DCTOT", x), "NA", x))
+xdf <- type.convert(xdf)
+colnames(xdf) <- c("reservoir", "abs_max_elev", "abs_max_stor", "norm_min_elev", "norm_min_stor", "elev", "stor", "evap", "chng", "net_rel", "inflow")
+xdf$reservoir <- as.character(xdf$reservoir)
+
+
+xdf <- xdf
+
+page_two <- l[page_breaks[2]:length(l)]
+
+do.call(
+  rbind.data.frame,
+  lapply(
+    stri_split_fixed(
+      stri_replace_all_regex(
+        stri_trim_both(page_two[stri_detect_regex(
+          stri_trim_both(page_two), # trim blanks
+          "^([^[:digit:]]+)([[:digit:]\\.]+)[[:space:]]+([^[:digit:]]+)([[:digit:]\\.]+)$" # find the release rows
+        )]),
+        "[[:space:]]{2,}", "\t" # make tab-separated fields wherever there are 2+ space breaks
+      ), "\t"),
+    function(x) {
+      if (length(x) > 2) { # one of the lines will only have one record but most have 2
+        data.frame(
+          facility = c(x[1],x[3]),
+          amt = as.numeric(c(x[2], x[4])),
+          stringsAsFactors = FALSE
+        )
+      } else {
+        data.frame(
+          facility = x[1],
+          amt = as.numeric(x[2]),
+          stringsAsFactors = FALSE
+        )
+      }
+    })
+) -> ydf
+xdf <<- xdf
+ydf <<- ydf
+}
+
+```
+
+
+
+# Scrape
+```{r}
+swp_daily(monday)
+xdf$date <- md
+ydf$date <- md
+mxdf <- xdf
+mydf <- ydf
+
+swp_daily(tuesday)
+xdf$date <- td
+ydf$date <- td
+txdf <- xdf
+tydf <- ydf
+
+swp_daily(wensday)
+xdf$date <- wd
+ydf$date <- wd
+wxdf <- xdf
+wydf <- ydf
+swp_daily(thursday)
+xdf$date <- thd
+ydf$date <- thd
+thxdf <- xdf
+thydf <- ydf
+
+swp_daily(friday)
+xdf$date <- fd
+ydf$date <- fd
+fxdf <- xdf
+fydf <- ydf
+
+swp_daily(saturday)
+xdf$date <- sd
+ydf$date <- sd
+sxdf <- xdf
+sydf <- ydf
+
+swp_daily(sunday)
+xdf$date <- sud
+ydf$date <- sud
+suxdf <- xdf
+suydf <- ydf
+```
+
+
+
+# Import / Merge / Update / Save
+```{r}
+library(xlsx)
+# Import
+setwd("Y:\\Share\\Water Conditions\\Daily Water Report")
+datax <- read.xlsx("DailyWaterReportWebScrape.xlsx", sheetName = "pg1")
+datay <- read.xlsx("DailyWaterReportWebScrape.xlsx", sheetName = "pg2")
+datax <- datax[,-1]
+datay <- datay[,-1]
+# Merge
+datanewx <- rbind(datax, mxdf, txdf, wxdf, thxdf, fxdf, sxdf, suxdf)
+datanewy <- rbind(datay, mydf, tydf, wydf, thydf, fydf, sydf, suydf)
+datanewx <- datanewx[!duplicated(datanewx),]
+datanewy <- datanewy[!duplicated(datanewy),]
+# Save
+wb <- createWorkbook(type = "xlsx")
+sheet1 <- createSheet(wb, sheetName = "pg1")
+sheet2 <- createSheet(wb, sheetName = "pg2")
+addDataFrame(datanewx, sheet1, startRow = 1, startColumn = 1)
+addDataFrame(datanewy, sheet2, startRow = 1, startColumn = 1)
+saveWorkbook(wb, "DailyWaterReportWebScrape.xlsx")
+```
